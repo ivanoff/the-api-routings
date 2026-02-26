@@ -130,6 +130,7 @@ write_assistant_header
 append_file "README.md" "markdown"
 append_file "package.json" "json"
 append_file "tsconfig.json" "json"
+append_file ".env.example" "env.example"
 append_file ".gitignore" "gitignore"
 
 write_user "Теперь приложи исходники из src и test."

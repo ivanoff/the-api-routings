@@ -6,7 +6,7 @@
   "description": "Routings for the-api",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ivanoff/the-api-routings"
+    "url": "https://github.com/the-api/the-api-routings"
   },
   "keywords": ["the-api", "routings"],
   "main": "./dist/index.js",

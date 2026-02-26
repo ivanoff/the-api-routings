@@ -19,6 +19,21 @@ router.crud({ table: 'posts' });
 npm i -S the-api-routings
 ```
 
+## Environment
+
+`_unlimited` query parameter is disabled by default.  
+Set `CAN_GET_UNLIMITED=true` to allow `?_unlimited=true`.
+
+`_limit` behavior can also be controlled with:
+- `LIMIT_DEFAULT` — default `_limit` value when request has no `_limit`
+- `LIMIT_MAX` — upper bound for `_limit` (caps both request `_limit` and `LIMIT_DEFAULT`)
+
+```dotenv
+CAN_GET_UNLIMITED=true
+LIMIT_DEFAULT=
+LIMIT_MAX=
+```
+
 ## Quick Start
 
 ```typescript
@@ -50,7 +65,7 @@ Every `GET` endpoint supports a rich set of filters out of the box.
 | `_limit` | `?_limit=20` | Records per page |
 | `_page` | `?_page=3` | Page number (1-based) |
 | `_skip` | `?_skip=100` | Skip N records |
-| `_unlimited` | `?_unlimited=true` | Return all records |
+| `_unlimited` | `?_unlimited=true` | Return all records (requires `CAN_GET_UNLIMITED`) |
 | `_after` | `?_after=2024-01-15&_sort=-timeCreated&_limit=20` | Cursor pagination |
 
 ### Sorting

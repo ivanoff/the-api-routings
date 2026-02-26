@@ -1,5 +1,36 @@
 // src/CrudBuilder.ts
 import flattening from "flattening";
+var getPositiveIntFromEnv = (name) => {
+  const value = process.env[name];
+  if (!value)
+    return;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1)
+    return;
+  return parsed;
+};
+var getQueryLimit = ({
+  _limit,
+  _unlimited
+}) => {
+  const canGetUnlimited = process.env.CAN_GET_UNLIMITED === "true";
+  const isUnlimited = canGetUnlimited && (_unlimited === "true" || _unlimited === true);
+  if (isUnlimited)
+    return;
+  const defaultLimit = getPositiveIntFromEnv("LIMIT_DEFAULT");
+  const maxLimit = getPositiveIntFromEnv("LIMIT_MAX");
+  let limit = _limit;
+  if ((typeof limit === "undefined" || limit === null || limit === "") && typeof defaultLimit !== "undefined") {
+    limit = defaultLimit;
+  }
+  if (!limit)
+    return;
+  const limitNumber = +limit;
+  if (typeof maxLimit !== "undefined" && !Number.isNaN(limitNumber) && limitNumber > maxLimit) {
+    return maxLimit;
+  }
+  return limit;
+};
 
 class CrudBuilder {
   c;
@@ -149,11 +180,11 @@ class CrudBuilder {
     _limit,
     _unlimited
   }) {
-    const isUnlimited = _unlimited === "true" || _unlimited === true;
-    if (!_limit || isUnlimited)
+    const limit = getQueryLimit({ _limit, _unlimited });
+    if (!limit)
       return;
-    this.res.limit(_limit);
-    const offset = _page ? (_page - 1) * _limit : 0;
+    this.res.limit(limit);
+    const offset = _page ? (_page - 1) * limit : 0;
     this.res.offset(offset + +_skip);
   }
   whereNotIn(whereNotInObj) {
@@ -518,14 +549,15 @@ class CrudBuilder {
     this.sort(_sort, db);
     const s = _sort || this.defaultSort;
     const sName = s?.replace(/^-/, "");
-    if (_after && _limit && s && this.getTableRows(c)[`${sName}`]) {
+    const limit = getQueryLimit({ _limit, _unlimited });
+    if (_after && limit && s && this.getTableRows(c)[`${sName}`]) {
       this.res.where(sName, s[0] === "-" ? "<" : ">", _after);
-      this.res.limit(_limit);
+      this.res.limit(limit);
     } else
       this.pagination({
         _page,
         _skip,
-        _limit,
+        _limit: limit,
         _unlimited
       });
     const result = await this.res;
@@ -542,16 +574,16 @@ class CrudBuilder {
       meta = {
         ...meta,
         isFirstPage: false,
-        isLastPage: !result.length || result.length < _limit
+        isLastPage: !result.length || (limit ? result.length < +limit : false)
       };
     } else {
-      const limit = +_limit;
+      const limit2 = +limit;
       const skip = +_skip || 0;
       const page = +_page || 1;
-      const pages = !limit ? 1 : Math.ceil((total - skip) / limit);
+      const pages = !limit2 ? 1 : Math.ceil((total - skip) / limit2);
       meta = {
         ...meta,
-        limit,
+        limit: limit2,
         skip,
         page,
         pages,

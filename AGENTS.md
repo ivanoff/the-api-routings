@@ -58,7 +58,7 @@ dist/                   # Build output (gitignored)
 | `_sort` | Sort: `?_sort=-created,name,random()` (NULLS LAST) |
 | `_limit`, `_page`, `_skip` | Offset pagination |
 | `_after` | Cursor pagination |
-| `_unlimited` | Disable limit |
+| `_unlimited` | Disable limit (requires `CAN_GET_UNLIMITED`) |
 | `_lang` | Translation language code |
 | `_search` | Trigram search (`%` and `<->` operators) |
 | `_join` | On-demand joins |
@@ -81,6 +81,11 @@ dist/                   # Build output (gitignored)
 - `permissions.fields.viewable` — fields visible per permission
 - `permissions.owner` — permissions granted to record owner
 - `hiddenFields` — fields stripped from response (SQL-level filtering NOT applied, post-query only)
+
+### Environment Variables
+- `CAN_GET_UNLIMITED` — enables `?_unlimited=true` when set to `'true'`
+- `LIMIT_DEFAULT` — default `_limit` for GET when request has no `_limit`
+- `LIMIT_MAX` — max allowed `_limit` (caps both request `_limit` and `LIMIT_DEFAULT`)
 
 ## Commands
 

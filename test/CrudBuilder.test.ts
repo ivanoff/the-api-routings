@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
+import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import CrudBuilder from '../src/CrudBuilder';
 import {
   createMockQb,
@@ -160,11 +160,32 @@ describe('CrudBuilder – sort', () => {
 describe('CrudBuilder – pagination', () => {
   let cb: CrudBuilder;
   let qb: any;
+  let prevCanGetUnlimited: string | undefined;
+  let prevLimitDefault: string | undefined;
+  let prevLimitMax: string | undefined;
 
   beforeEach(() => {
+    prevCanGetUnlimited = process.env.CAN_GET_UNLIMITED;
+    prevLimitDefault = process.env.LIMIT_DEFAULT;
+    prevLimitMax = process.env.LIMIT_MAX;
+    delete process.env.CAN_GET_UNLIMITED;
+    delete process.env.LIMIT_DEFAULT;
+    delete process.env.LIMIT_MAX;
+
     cb = new CrudBuilder({ table: 't' });
     qb = createMockQb();
     cb.res = qb;
+  });
+
+  afterEach(() => {
+    if (typeof prevCanGetUnlimited === 'undefined') delete process.env.CAN_GET_UNLIMITED;
+    else process.env.CAN_GET_UNLIMITED = prevCanGetUnlimited;
+
+    if (typeof prevLimitDefault === 'undefined') delete process.env.LIMIT_DEFAULT;
+    else process.env.LIMIT_DEFAULT = prevLimitDefault;
+
+    if (typeof prevLimitMax === 'undefined') delete process.env.LIMIT_MAX;
+    else process.env.LIMIT_MAX = prevLimitMax;
   });
 
   it('does nothing when no _limit', () => {
@@ -172,19 +193,46 @@ describe('CrudBuilder – pagination', () => {
     expect(qb.limit).not.toHaveBeenCalled();
   });
 
-  it('does nothing when _unlimited is true', () => {
+  it('does nothing when _unlimited is true and CAN_GET_UNLIMITED=true', () => {
+    process.env.CAN_GET_UNLIMITED = 'true';
     cb.pagination({ _limit: 10, _unlimited: 'true' });
     expect(qb.limit).not.toHaveBeenCalled();
   });
 
-  it('does nothing when _unlimited is boolean true', () => {
+  it('does nothing when _unlimited is boolean true and CAN_GET_UNLIMITED=true', () => {
+    process.env.CAN_GET_UNLIMITED = 'true';
     cb.pagination({ _limit: 10, _unlimited: true });
     expect(qb.limit).not.toHaveBeenCalled();
+  });
+
+  it('ignores _unlimited when CAN_GET_UNLIMITED is not enabled', () => {
+    cb.pagination({ _limit: 10, _unlimited: 'true' });
+    expect(qb.limit).toHaveBeenCalledWith(10);
   });
 
   it('applies limit', () => {
     cb.pagination({ _limit: 25 });
     expect(qb.limit).toHaveBeenCalledWith(25);
+  });
+
+  it('applies LIMIT_DEFAULT when _limit is missing', () => {
+    process.env.LIMIT_DEFAULT = '15';
+    cb.pagination({ _limit: undefined });
+    expect(qb.limit).toHaveBeenCalledWith(15);
+    expect(qb.offset).toHaveBeenCalledWith(0);
+  });
+
+  it('applies LIMIT_MAX cap', () => {
+    process.env.LIMIT_MAX = '20';
+    cb.pagination({ _limit: 25 });
+    expect(qb.limit).toHaveBeenCalledWith(20);
+  });
+
+  it('applies LIMIT_MAX to LIMIT_DEFAULT', () => {
+    process.env.LIMIT_DEFAULT = '200';
+    process.env.LIMIT_MAX = '50';
+    cb.pagination({ _limit: undefined });
+    expect(qb.limit).toHaveBeenCalledWith(50);
   });
 
   it('applies offset from _page', () => {
@@ -705,6 +753,59 @@ describe('CrudBuilder – get', () => {
     expect(sets.meta.isFirstPage).toBe(false);
     expect(sets.meta.isLastPage).toBe(false);
     expect(sets.meta.nextPage).toBe(3);
+  });
+
+  it('uses LIMIT_DEFAULT when _limit is missing', async () => {
+    const prevLimitDefault = process.env.LIMIT_DEFAULT;
+    const prevLimitMax = process.env.LIMIT_MAX;
+    process.env.LIMIT_DEFAULT = '10';
+    delete process.env.LIMIT_MAX;
+
+    try {
+      const { c, sets, readQb } = createMockContext({
+        data: [{ id: 1 }],
+        totalCount: 35,
+        tableRows: { id: {} },
+        queries: {},
+      });
+
+      const cb = new CrudBuilder(DEFAULT_CRUD_PARAMS);
+      await cb.get(c);
+
+      expect(readQb?.limit).toHaveBeenCalledWith(10);
+      expect(sets.meta.limit).toBe(10);
+      expect(sets.meta.pages).toBe(4);
+    } finally {
+      if (typeof prevLimitDefault === 'undefined') delete process.env.LIMIT_DEFAULT;
+      else process.env.LIMIT_DEFAULT = prevLimitDefault;
+
+      if (typeof prevLimitMax === 'undefined') delete process.env.LIMIT_MAX;
+      else process.env.LIMIT_MAX = prevLimitMax;
+    }
+  });
+
+  it('caps _limit with LIMIT_MAX', async () => {
+    const prevLimitMax = process.env.LIMIT_MAX;
+    process.env.LIMIT_MAX = '20';
+
+    try {
+      const { c, sets, readQb } = createMockContext({
+        data: [{ id: 1 }],
+        totalCount: 100,
+        tableRows: { id: {} },
+        queries: { _limit: ['50'], _page: ['2'] },
+      });
+
+      const cb = new CrudBuilder(DEFAULT_CRUD_PARAMS);
+      await cb.get(c);
+
+      expect(readQb?.limit).toHaveBeenCalledWith(20);
+      expect(sets.meta.limit).toBe(20);
+      expect(sets.meta.pages).toBe(5);
+    } finally {
+      if (typeof prevLimitMax === 'undefined') delete process.env.LIMIT_MAX;
+      else process.env.LIMIT_MAX = prevLimitMax;
+    }
   });
 
   it('marks first page', async () => {
