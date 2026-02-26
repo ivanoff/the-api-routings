@@ -27,6 +27,35 @@ function buildContext(overrides: Parameters<typeof createMockContext>[0] = {}): 
   });
 }
 
+describe('Context bindings', () => {
+  it('uses c.var.db when c.env.db is missing', async () => {
+    const { c, db } = buildContext({
+      queries: { _limit: ['10'] },
+      queryResult: [{ id: 1, name: 'Alice' }],
+      countResult: 1,
+    });
+    (c as unknown as { env: Record<string, unknown> }).env = {};
+
+    const crud = new CrudBuilder(defaultOptions);
+    await crud.get(c);
+
+    expect(db.countBuilder.hasCalled('count')).toBe(true);
+  });
+
+  it('uses c.var.dbWrite when c.env.dbWrite is missing', async () => {
+    const { c, dbWrite } = buildContext({
+      body: { name: 'Alice' },
+      writeResult: [{ id: 1, name: 'Alice' }],
+    });
+    (c as unknown as { env: Record<string, unknown> }).env = {};
+
+    const crud = new CrudBuilder({ ...defaultOptions, dbTables: usersColumns });
+    await crud.add(c);
+
+    expect(dbWrite.queryBuilder.hasCalled('insert')).toBe(true);
+  });
+});
+
 // -- 1. SQL Injection: _sort validation --------------------
 
 describe('Security: _sort validation', () => {

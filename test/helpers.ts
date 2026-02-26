@@ -1,5 +1,12 @@
 import type { Knex } from 'knex';
-import type { AppContext, ColumnInfoMap, EnvBindings, UserType, RolesService } from '../src/types';
+import type {
+  AppContext,
+  ColumnInfoMap,
+  EnvBindings,
+  RolesService,
+  UserType,
+  VarBindings,
+} from '../src/types';
 
 // -- Chainable Knex QueryBuilder mock ----------------------
 
@@ -151,8 +158,12 @@ export function createMockContext(opts: MockContextOptions = {}): MockContextRes
       roles: opts.roles,
     } satisfies EnvBindings as EnvBindings,
     var: {
+      db: db.knex,
+      dbWrite: dbWrite.knex,
+      dbTables: opts.dbTables || {},
+      roles: opts.roles,
       user: opts.user,
-    },
+    } satisfies VarBindings as VarBindings,
     set: (key: string, value: unknown) => { store[key] = value; },
   } as unknown as AppContext;
 

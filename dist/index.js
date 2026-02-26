@@ -105,17 +105,36 @@ class CrudBuilder {
     this.relations = options.relations;
   }
   initState(c) {
-    const env = c.env;
+    const db = this.getDbFromContext(c);
+    const dbTables = this.getDbTablesFromContext(c);
     this.state = {
-      res: this.getDbWithSchema(env.db),
-      rows: env.dbTables?.[`${this.schema}.${this.table}`] || {},
+      res: this.getDbWithSchema(db),
+      rows: dbTables[`${this.schema}.${this.table}`] || {},
       user: c.var?.user,
-      roles: env.roles,
+      roles: this.getRolesFromContext(c),
       lang: this.defaultLang,
       coalesceWhere: {},
       coalesceWhereReplacements: {},
       langJoin: {}
     };
+  }
+  getDbFromContext(c) {
+    const db = c.var?.db || c.env?.db;
+    if (!db)
+      throw new Error("DB_CONNECTION_REQUIRED");
+    return db;
+  }
+  getDbWriteFromContext(c) {
+    const dbWrite = c.var?.dbWrite || c.env?.dbWrite;
+    if (!dbWrite)
+      throw new Error("DB_WRITE_CONNECTION_REQUIRED");
+    return dbWrite;
+  }
+  getDbTablesFromContext(c) {
+    return c.var?.dbTables || c.env?.dbTables || {};
+  }
+  getRolesFromContext(c) {
+    return c.var?.roles || c.env?.roles;
   }
   getDbWithSchema(db) {
     const qb = db(this.table);
@@ -348,7 +367,10 @@ class CrudBuilder {
       const f3 = field || `jsonb_agg(${f2})`;
       const wb = {};
       if (whereBindings) {
-        const envAll = { ...c.env };
+        const envAll = {
+          ...c.env,
+          ...c.var
+        };
         ["db", "dbWrite", "dbTables", "error", "getErrorByMessage", "log"].forEach((key) => delete envAll[key]);
         const dd = flattening({
           env: envAll,
@@ -564,7 +586,7 @@ class CrudBuilder {
   }
   async getRequestResult(c, q) {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
     const queries = q || c.req.queries();
     const queriesFlat = {};
     for (const [name, value] of Object.entries(queries)) {
@@ -664,7 +686,7 @@ class CrudBuilder {
   }
   async getById(c) {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
     const { id } = c.req.param();
     const { _fields, _lang, _join, ...whereWithParams } = c.req.query();
     const where = {};
@@ -703,7 +725,7 @@ class CrudBuilder {
     const body = await c.req.json();
     const data = this.updateIncomingData(c, body);
     const validatedData = Array.isArray(data) ? data.map((item) => this.validateIntegerFields(item)) : this.validateIntegerFields(data);
-    const result = await this.getDbWithSchema(c.env.dbWrite).insert(validatedData).returning("*");
+    const result = await this.getDbWithSchema(this.getDbWriteFromContext(c)).insert(validatedData).returning("*");
     c.set("result", result[0]);
     c.set("relationsData", this.relations);
   }
@@ -719,7 +741,7 @@ class CrudBuilder {
   }
   async update(c) {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
     const params = c.req.param();
     const whereClause = { ...params };
     if (this.dbTables?.id?.data_type === "integer" && Number.isNaN(+String(whereClause.id))) {
@@ -733,7 +755,7 @@ class CrudBuilder {
     if (Object.keys(data).length) {
       if (rows.timeUpdated)
         data.timeUpdated = db.fn.now();
-      await this.getDbWithSchema(c.env.dbWrite).update(data).where(whereClause);
+      await this.getDbWithSchema(this.getDbWriteFromContext(c)).update(data).where(whereClause);
     }
     await this.getById(c);
   }
@@ -746,7 +768,7 @@ class CrudBuilder {
     const rows = this.state.rows;
     if (rows.isDeleted)
       whereClause.isDeleted = false;
-    const t = this.getDbWithSchema(c.env.dbWrite).where(whereClause);
+    const t = this.getDbWithSchema(this.getDbWriteFromContext(c)).where(whereClause);
     const result = rows.isDeleted ? await t.update({ isDeleted: true }) : await t.delete();
     c.set("result", { ok: true });
     c.set("meta", { countDeleted: result });

@@ -145,12 +145,13 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
   // -- State management ------------------------------------
 
   private initState(c: AppContext): void {
-    const env = c.env;
+    const db = this.getDbFromContext(c);
+    const dbTables = this.getDbTablesFromContext(c);
     this.state = {
-      res: this.getDbWithSchema(env.db),
-      rows: env.dbTables?.[`${this.schema}.${this.table}`] || {},
+      res: this.getDbWithSchema(db),
+      rows: dbTables[`${this.schema}.${this.table}`] || {},
       user: c.var?.user as UserType | undefined,
-      roles: env.roles,
+      roles: this.getRolesFromContext(c),
       lang: this.defaultLang,
       coalesceWhere: {},
       coalesceWhereReplacements: {},
@@ -159,6 +160,26 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
   }
 
   // -- DB helpers ------------------------------------------
+
+  private getDbFromContext(c: AppContext): Knex {
+    const db = c.var?.db || c.env?.db;
+    if (!db) throw new Error('DB_CONNECTION_REQUIRED');
+    return db;
+  }
+
+  private getDbWriteFromContext(c: AppContext): Knex {
+    const dbWrite = c.var?.dbWrite || c.env?.dbWrite;
+    if (!dbWrite) throw new Error('DB_WRITE_CONNECTION_REQUIRED');
+    return dbWrite;
+  }
+
+  private getDbTablesFromContext(c: AppContext): Record<string, ColumnInfoMap> {
+    return (c.var?.dbTables || c.env?.dbTables || {}) as Record<string, ColumnInfoMap>;
+  }
+
+  private getRolesFromContext(c: AppContext): RequestState['roles'] {
+    return (c.var?.roles || c.env?.roles) as RequestState['roles'];
+  }
 
   private getDbWithSchema(db: Knex): Knex.QueryBuilder {
     const qb = db(this.table);
@@ -452,7 +473,10 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
       const wb: Record<string, unknown> = {};
 
       if (whereBindings) {
-        const envAll = { ...c.env } as Record<string, unknown>;
+        const envAll = {
+          ...(c.env as Record<string, unknown>),
+          ...(c.var as Record<string, unknown>),
+        };
         ['db', 'dbWrite', 'dbTables', 'error', 'getErrorByMessage', 'log']
           .forEach((key) => delete envAll[key]);
 
@@ -743,7 +767,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
     q?: Record<string, string[]>,
   ): Promise<getResultType<T>> {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
 
     const queries = q || c.req.queries();
     const queriesFlat: Record<string, string | string[]> = {};
@@ -869,7 +893,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
 
   async getById(c: AppContext): Promise<void> {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
     const { id } = c.req.param();
 
     const { _fields, _lang, _join, ...whereWithParams } = c.req.query();
@@ -924,7 +948,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
       ? data.map((item) => this.validateIntegerFields(item))
       : this.validateIntegerFields(data);
 
-    const result = await this.getDbWithSchema(c.env.dbWrite)
+    const result = await this.getDbWithSchema(this.getDbWriteFromContext(c))
       .insert(validatedData)
       .returning('*');
 
@@ -948,7 +972,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
 
   async update(c: AppContext): Promise<void> {
     this.initState(c);
-    const db = c.env.db;
+    const db = this.getDbFromContext(c);
     const params = c.req.param();
     const whereClause: WhereParams = { ...params };
 
@@ -966,7 +990,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
 
     if (Object.keys(data).length) {
       if (rows.timeUpdated) data.timeUpdated = db.fn.now();
-      await this.getDbWithSchema(c.env.dbWrite).update(data).where(whereClause);
+      await this.getDbWithSchema(this.getDbWriteFromContext(c)).update(data).where(whereClause);
     }
 
     await this.getById(c);
@@ -986,7 +1010,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
     const rows = this.state.rows;
     if (rows.isDeleted) whereClause.isDeleted = false;
 
-    const t = this.getDbWithSchema(c.env.dbWrite).where(whereClause);
+    const t = this.getDbWithSchema(this.getDbWriteFromContext(c)).where(whereClause);
     const result = rows.isDeleted ? await t.update({ isDeleted: true }) : await t.delete();
 
     c.set('result', { ok: true });

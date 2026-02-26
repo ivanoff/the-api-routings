@@ -38,6 +38,10 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
     private state;
     constructor(options: CrudBuilderOptionsType<T>);
     private initState;
+    private getDbFromContext;
+    private getDbWriteFromContext;
+    private getDbTablesFromContext;
+    private getRolesFromContext;
     private getDbWithSchema;
     private getKnownColumnNames;
     private isValidSortField;

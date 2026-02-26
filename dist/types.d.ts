@@ -32,16 +32,17 @@ export interface RolesService {
         permissions: Record<string, boolean>;
     }): boolean;
 }
-export type EnvBindings = {
-    db: Knex;
-    dbWrite: Knex;
-    dbTables: Record<string, ColumnInfoMap>;
+export type ContextServices = {
+    db?: Knex;
+    dbWrite?: Knex;
+    dbTables?: Record<string, ColumnInfoMap>;
     roles?: RolesService;
     error?: (code: string, status?: number) => void;
     getErrorByMessage?: (message: string) => unknown;
     log?: (...args: unknown[]) => void;
 };
-export type VarBindings = {
+export type EnvBindings = ContextServices;
+export type VarBindings = ContextServices & {
     user?: UserType;
     result?: unknown;
     meta?: metaType | Record<string, unknown>;
