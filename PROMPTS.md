@@ -112,6 +112,21 @@ router.crud({ table: 'posts' });
 npm i -S the-api-routings
 ```
 
+## Environment
+
+`_unlimited` query parameter is disabled by default.  
+Set `CAN_GET_UNLIMITED=true` to allow `?_unlimited=true`.
+
+`_limit` behavior can also be controlled with:
+- `LIMIT_DEFAULT` — default `_limit` value when request has no `_limit`
+- `LIMIT_MAX` — upper bound for `_limit` (caps both request `_limit` and `LIMIT_DEFAULT`)
+
+```dotenv
+CAN_GET_UNLIMITED=true
+LIMIT_DEFAULT=
+LIMIT_MAX=
+```
+
 ## Quick Start
 
 ```typescript
@@ -143,7 +158,7 @@ Every `GET` endpoint supports a rich set of filters out of the box.
 | `_limit` | `?_limit=20` | Records per page |
 | `_page` | `?_page=3` | Page number (1-based) |
 | `_skip` | `?_skip=100` | Skip N records |
-| `_unlimited` | `?_unlimited=true` | Return all records |
+| `_unlimited` | `?_unlimited=true` | Return all records (requires `CAN_GET_UNLIMITED`) |
 | `_after` | `?_after=2024-01-15&_sort=-timeCreated&_limit=20` | Cursor pagination |
 
 ### Sorting
@@ -537,6 +552,18 @@ MIT © [Dimitry Ivanov](https://github.com/ivanoff)
 }
 ```
 
+### .env.example
+```env.example
+# Enables support for ?_unlimited=true when value is exactly "true".
+CAN_GET_UNLIMITED=true
+
+# Default limit for GET queries when request has no _limit.
+LIMIT_DEFAULT=
+
+# Max allowed _limit for GET queries (caps request _limit and LIMIT_DEFAULT).
+LIMIT_MAX=
+```
+
 ### .gitignore
 ```gitignore
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
@@ -725,6 +752,43 @@ import type { CrudBuilderOptionsType, CrudBuilderPermissionsType, DbTablesType, 
 import type { Context } from 'hono';
 import type { Knex } from 'knex';
 
+const getPositiveIntFromEnv = (name: 'LIMIT_DEFAULT' | 'LIMIT_MAX') => {
+  const value = process.env[name];
+  if (!value) return;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return;
+  return parsed;
+};
+
+const getQueryLimit = ({
+  _limit,
+  _unlimited,
+}: {
+  _limit?: any;
+  _unlimited?: any;
+}) => {
+  const canGetUnlimited = process.env.CAN_GET_UNLIMITED === 'true';
+  const isUnlimited = canGetUnlimited && (_unlimited === 'true' || _unlimited === true);
+  if (isUnlimited) return;
+
+  const defaultLimit = getPositiveIntFromEnv('LIMIT_DEFAULT');
+  const maxLimit = getPositiveIntFromEnv('LIMIT_MAX');
+
+  let limit: any = _limit;
+  if ((typeof limit === 'undefined' || limit === null || limit === '') && typeof defaultLimit !== 'undefined') {
+    limit = defaultLimit;
+  }
+
+  if (!limit) return;
+
+  const limitNumber = +limit;
+  if (typeof maxLimit !== 'undefined' && !Number.isNaN(limitNumber) && limitNumber > maxLimit) {
+    return maxLimit;
+  }
+
+  return limit;
+};
+
 export default class CrudBuilder {
   c?: Context;
   table: any;
@@ -879,11 +943,11 @@ export default class CrudBuilder {
     _page, _skip = 0, _limit, _unlimited,
   }: any) {
 
-    const isUnlimited = _unlimited === 'true' || _unlimited === true;
-    if (!_limit || isUnlimited) return;
+    const limit = getQueryLimit({ _limit, _unlimited });
+    if (!limit) return;
 
-    this.res.limit(_limit);
-    const offset = _page ? (_page - 1) * _limit : 0;
+    this.res.limit(limit);
+    const offset = _page ? (_page - 1) * limit : 0;
     this.res.offset(offset + (+_skip));
   }
 
@@ -1289,13 +1353,15 @@ export default class CrudBuilder {
 
     const s = _sort || this.defaultSort;
     const sName = s?.replace(/^-/, '')
-    if (_after && _limit && s && this.getTableRows(c)[`${sName}`]) {
+    const limit = getQueryLimit({ _limit, _unlimited });
+
+    if (_after && limit && s && this.getTableRows(c)[`${sName}`]) {
       this.res.where(sName, s[0] === '-' ? '<' : '>', _after);
-      this.res.limit(_limit);
+      this.res.limit(limit);
     }
 
     else this.pagination({
-      _page, _skip, _limit, _unlimited,
+      _page, _skip, _limit: limit, _unlimited,
     });
 
     // if (_or) console.log(this.res.toSQL())
@@ -1325,16 +1391,16 @@ export default class CrudBuilder {
       meta = {
         ...meta,
         isFirstPage: false,
-        isLastPage: !result.length || result.length < _limit,
+        isLastPage: !result.length || (limit ? result.length < +limit : false),
       };
     } else {
-      const limit = +_limit;
+      const limit2 = +limit;
       const skip = +_skip || 0;
       const page = +_page || 1;
-      const pages = !limit ? 1 : Math.ceil((total-skip) / limit);
+      const pages = !limit2 ? 1 : Math.ceil((total-skip) / limit2);
       meta = {
         ...meta,
-        limit,
+        limit: limit2,
         skip,
         page,
         pages,
