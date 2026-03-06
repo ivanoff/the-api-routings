@@ -15,7 +15,6 @@ describe('Routings', () => {
       expect(paths).toContain('GET /posts');
       expect(paths).toContain('POST /posts');
       expect(paths).toContain('GET /posts/:id');
-      expect(paths).toContain('PUT /posts/:id');
       expect(paths).toContain('PATCH /posts/:id');
       expect(paths).toContain('DELETE /posts/:id');
       expect(router.routes.length).toBe(6);
@@ -63,7 +62,6 @@ describe('Routings', () => {
 
       expect(router.routesPermissions).toHaveProperty('GET /items');
       expect(router.routesPermissions).toHaveProperty('POST /items');
-      expect(router.routesPermissions).toHaveProperty('PUT /items/:id');
       expect(router.routesPermissions).toHaveProperty('PATCH /items/:id');
       expect(router.routesPermissions).toHaveProperty('DELETE /items/:id');
     });
@@ -86,13 +84,6 @@ describe('Routings', () => {
       router.post('/items', async () => {});
 
       expect(router.routes[0].method).toBe('POST');
-    });
-
-    it('registers PUT route', () => {
-      const router = new Routings();
-      router.put('/items/:id', async () => {});
-
-      expect(router.routes[0].method).toBe('PUT');
     });
 
     it('registers PATCH route', () => {

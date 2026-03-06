@@ -968,7 +968,7 @@ export default class CrudBuilder<T extends Record<string, unknown> = Record<stri
     return data;
   }
 
-  // -- PUT / PATCH -----------------------------------------
+  // -- PATCH -----------------------------------------
 
   async update(c: AppContext): Promise<void> {
     this.initState(c);

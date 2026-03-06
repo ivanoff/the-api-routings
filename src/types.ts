@@ -4,7 +4,7 @@ import type { Knex } from 'knex';
 
 export type { MiddlewareHandler, Handler };
 
-export type MethodsType = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'OPTIONS';
+export type MethodsType = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'OPTIONS';
 
 export type MethodPathType = {
   method?: MethodsType;

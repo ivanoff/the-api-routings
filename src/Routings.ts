@@ -44,10 +44,6 @@ export class Routings {
     this.pushToRoutes({ method: 'PATCH', path, fnArr });
   }
 
-  put(path: string, ...fnArr: MiddlewareHandler[]): void {
-    this.pushToRoutes({ method: 'PUT', path, fnArr });
-  }
-
   delete(path: string, ...fnArr: MiddlewareHandler[]): void {
     this.pushToRoutes({ method: 'DELETE', path, fnArr });
   }
@@ -76,10 +72,6 @@ export class Routings {
       const cb = new CrudBuilder(params);
       await cb.getById(c as AppContext);
     });
-    this.put(`${p}/:id`, async (c) => {
-      const cb = new CrudBuilder(params);
-      await cb.update(c as AppContext);
-    });
     this.patch(`${p}/:id`, async (c) => {
       const cb = new CrudBuilder(params);
       await cb.update(c as AppContext);
@@ -97,7 +89,7 @@ export class Routings {
       };
 
       const methods: MethodsType[] = permissions.protectedMethods[0] === '*'
-        ? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+        ? ['GET', 'POST', 'PATCH', 'DELETE']
         : (permissions.protectedMethods as MethodsType[]);
 
       for (const method of methods) {

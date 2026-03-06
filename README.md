@@ -8,7 +8,6 @@ router.crud({ table: 'posts' });
 // GET    /posts
 // POST   /posts
 // GET    /posts/:id
-// PUT    /posts/:id
 // PATCH  /posts/:id
 // DELETE /posts/:id
 ```
@@ -117,7 +116,6 @@ const router = new Routings();
 
 router.get('/health', async (c) => { c.set('result', { ok: true }); });
 router.post('/upload', authMiddleware, async (c) => { /* ... */ });
-router.put('/items/:id', async (c) => { /* ... */ });
 router.patch('/items/:id', async (c) => { /* ... */ });
 router.delete('/items/:id', async (c) => { /* ... */ });
 
@@ -178,7 +176,7 @@ router.crud({
 
   // permissions
   permissions: {
-    protectedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
+    protectedMethods: ['POST', 'PATCH', 'DELETE'],
     owner: ['posts.view_private'],
     fields: {
       viewable: {
