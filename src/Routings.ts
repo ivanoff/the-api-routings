@@ -2,6 +2,7 @@ import { createFactory } from 'hono/factory';
 import CrudBuilder from './CrudBuilder';
 import type {
   AppContext,
+  CrudPermissionMeta,
   CrudBuilderOptionsType,
   MethodsType,
   MiddlewareHandler,
@@ -11,6 +12,8 @@ import type {
   RoutesType,
   RoutingsOptionsType,
 } from './types';
+import { normalizeCrudConfig } from './crudConfig';
+import { createCrudValidationMiddleware } from './Validatior';
 
 const factory = createFactory();
 
@@ -19,6 +22,7 @@ export class Routings {
   routesPermissions: Record<string, string[]> = {};
   routesErrors: RoutesErrorsType = {};
   routesEmailTemplates: RoutesEmailTemplatesType = {};
+  crudPermissionsMeta: CrudPermissionMeta[] = [];
   migrationDirs: string[] | undefined;
 
   constructor(options?: RoutingsOptionsType) {
@@ -57,42 +61,68 @@ export class Routings {
   }
 
   crud(params: CrudBuilderOptionsType): void {
-    const { prefix, table, permissions } = params;
+    const normalizedParams = normalizeCrudConfig(params);
+    const { prefix, table, permissions } = normalizedParams;
     const p = `/${prefix || table}`.replace(/^\/+/, '/');
+    const permissionPrefix = p.replace(/^\//, '');
+    const methods = permissions?.methods || permissions?.protectedMethods;
+    const methodsConfigured = Array.isArray(methods);
+    const hasExplicitOwnerPermissions = !!normalizedParams.permissions?.owner?.length;
 
-    this.get(`${p}`, async (c) => {
-      const cb = new CrudBuilder(params);
+    const validate = createCrudValidationMiddleware(normalizedParams);
+    const createCrudBuilder = (c: AppContext): CrudBuilder => {
+      const cb = new CrudBuilder(normalizedParams);
+      if (hasExplicitOwnerPermissions) return cb;
+
+      const roles = c.var.roles;
+      if (!roles || typeof roles.getPermissions !== 'function') return cb;
+
+      const ownerPermissions = roles.getPermissions(['owner']);
+      if (!ownerPermissions || typeof ownerPermissions !== 'object') return cb;
+
+      (cb as unknown as { ownerPermissions: Record<string, boolean> }).ownerPermissions = ownerPermissions;
+      return cb;
+    };
+
+    this.get(`${p}`, validate('getAll') as never, async (c) => {
+      const cb = createCrudBuilder(c as AppContext);
       await cb.get(c as AppContext);
     });
-    this.post(`${p}`, async (c) => {
-      const cb = new CrudBuilder(params);
+    this.post(`${p}`, validate('post') as never, async (c) => {
+      const cb = createCrudBuilder(c as AppContext);
       await cb.add(c as AppContext);
     });
-    this.get(`${p}/:id`, async (c) => {
-      const cb = new CrudBuilder(params);
+    this.get(`${p}/:id`, validate('getOne') as never, async (c) => {
+      const cb = createCrudBuilder(c as AppContext);
       await cb.getById(c as AppContext);
     });
-    this.patch(`${p}/:id`, async (c) => {
-      const cb = new CrudBuilder(params);
+    this.patch(`${p}/:id`, validate('patch') as never, async (c) => {
+      const cb = createCrudBuilder(c as AppContext);
       await cb.update(c as AppContext);
     });
-    this.delete(`${p}/:id`, async (c) => {
-      const cb = new CrudBuilder(params);
+    this.delete(`${p}/:id`, validate('delete') as never, async (c) => {
+      const cb = createCrudBuilder(c as AppContext);
       await cb.delete(c as AppContext);
     });
 
-    if (permissions?.protectedMethods) {
+    this.crudPermissionsMeta.push({
+      path: p,
+      permissionPrefix,
+      methodsConfigured,
+    });
+
+    if (methods?.length) {
       const register = (path: string, method: string): void => {
         const key = `${method} ${path}`;
         if (!this.routesPermissions[key]) this.routesPermissions[key] = [];
-        this.routesPermissions[key].push(`${p.replace(/^\//, '')}.${method.toLowerCase()}`);
+        this.routesPermissions[key].push(`${permissionPrefix}.${method.toLowerCase()}`);
       };
 
-      const methods: MethodsType[] = permissions.protectedMethods[0] === '*'
+      const protectedMethods: MethodsType[] = methods[0] === '*'
         ? ['GET', 'POST', 'PATCH', 'DELETE']
-        : (permissions.protectedMethods as MethodsType[]);
+        : (methods as MethodsType[]);
 
-      for (const method of methods) {
+      for (const method of protectedMethods) {
         if (method === 'POST' || method === 'GET') register(p, method);
         if (method !== 'POST') register(`${p}/:id`, method);
       }

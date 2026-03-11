@@ -17,7 +17,8 @@ describe('Routings', () => {
       expect(paths).toContain('GET /posts/:id');
       expect(paths).toContain('PATCH /posts/:id');
       expect(paths).toContain('DELETE /posts/:id');
-      expect(router.routes.length).toBe(5);
+      // Each CRUD route has validation middleware + route handler.
+      expect(router.routes.length).toBe(10);
     });
 
     it('uses prefix when provided', () => {
@@ -53,6 +54,19 @@ describe('Routings', () => {
       expect(router.routesPermissions).not.toHaveProperty('GET /posts');
     });
 
+    it('registers permissions for methods alias', () => {
+      const router = new Routings();
+      router.crud({
+        table: 'posts',
+        permissions: {
+          methods: ['PATCH'],
+        },
+      });
+
+      expect(router.routesPermissions).toHaveProperty('PATCH /posts/:id');
+      expect(router.routesPermissions).not.toHaveProperty('POST /posts');
+    });
+
     it('expands wildcard * permissions to all methods', () => {
       const router = new Routings();
       router.crud({
@@ -64,6 +78,18 @@ describe('Routings', () => {
       expect(router.routesPermissions).toHaveProperty('POST /items');
       expect(router.routesPermissions).toHaveProperty('PATCH /items/:id');
       expect(router.routesPermissions).toHaveProperty('DELETE /items/:id');
+    });
+
+    it('stores CRUD permissions meta', () => {
+      const router = new Routings();
+      router.crud({ table: 'items' });
+
+      expect(router.crudPermissionsMeta.length).toBe(1);
+      expect(router.crudPermissionsMeta[0]).toEqual({
+        path: '/items',
+        permissionPrefix: 'items',
+        methodsConfigured: false,
+      });
     });
   });
 

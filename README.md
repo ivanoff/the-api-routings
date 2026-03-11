@@ -176,7 +176,8 @@ router.crud({
 
   // permissions
   permissions: {
-    protectedMethods: ['POST', 'PATCH', 'DELETE'],
+    methods: ['POST', 'PATCH', 'DELETE'], // preferred
+    // protectedMethods: ['POST', 'PATCH', 'DELETE'], // legacy alias
     owner: ['posts.view_private'],
     fields: {
       viewable: {
