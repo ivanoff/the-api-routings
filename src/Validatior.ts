@@ -25,7 +25,7 @@ const DEFAULT_VALIDATION_ERROR = {
   description: 'Validation error',
 };
 
-type CrudValidationAction = 'getAll' | 'getOne' | 'post' | 'patch' | 'delete';
+type CrudValidationAction = 'get' | 'post' | 'patch' | 'delete';
 
 type CrudValidationSchema = {
   params?: ValidationSchema;
@@ -937,13 +937,7 @@ const validateActionSections = async (
     }
   };
 
-  if (action === 'getAll') {
-    await run('query', merged.query, getQueryData(c));
-    await run('headers', merged.headers, getHeaderData(c));
-    return errors;
-  }
-
-  if (action === 'getOne') {
+  if (action === 'get') {
     await run('params', merged.params, c.req.param() as Record<string, unknown>);
     await run('query', merged.query, getQueryData(c));
     await run('headers', merged.headers, getHeaderData(c));

@@ -84,7 +84,7 @@ export class Routings {
       return cb;
     };
 
-    this.get(`${p}`, validate('getAll') as never, async (c) => {
+    this.get(`${p}`, validate('get') as never, async (c) => {
       const cb = createCrudBuilder(c as AppContext);
       await cb.get(c as AppContext);
     });
@@ -92,7 +92,7 @@ export class Routings {
       const cb = createCrudBuilder(c as AppContext);
       await cb.add(c as AppContext);
     });
-    this.get(`${p}/:id`, validate('getOne') as never, async (c) => {
+    this.get(`${p}/:id`, validate('get') as never, async (c) => {
       const cb = createCrudBuilder(c as AppContext);
       await cb.getById(c as AppContext);
     });
