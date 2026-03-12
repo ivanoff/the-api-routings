@@ -1475,6 +1475,7 @@ var setValidationError = (c, issues) => {
 };
 var validateActionSections = async (c, action, merged) => {
   const errors = [];
+  const paramsData = c.req.param();
   let bodyData;
   let bodyLoaded = false;
   const ensureBody = async () => {
@@ -1507,13 +1508,10 @@ var validateActionSections = async (c, action, merged) => {
       errors.push(...validateDataBySchema(data, runtime.schema, sectionName));
     }
   };
-  if (action === "getAll") {
-    await run("query", merged.query, getQueryData(c));
-    await run("headers", merged.headers, getHeaderData(c));
-    return errors;
-  }
-  if (action === "getOne") {
-    await run("params", merged.params, c.req.param());
+  if (action === "get") {
+    if (Object.keys(paramsData).length) {
+      await run("params", merged.params, paramsData);
+    }
     await run("query", merged.query, getQueryData(c));
     await run("headers", merged.headers, getHeaderData(c));
     return errors;
@@ -1524,12 +1522,12 @@ var validateActionSections = async (c, action, merged) => {
     return errors;
   }
   if (action === "patch") {
-    await run("params", merged.params, c.req.param());
+    await run("params", merged.params, paramsData);
     await run("headers", merged.headers, getHeaderData(c));
     await run("body", merged.body?.patch, await ensureBody());
     return errors;
   }
-  await run("params", merged.params, c.req.param());
+  await run("params", merged.params, paramsData);
   await run("headers", merged.headers, getHeaderData(c));
   return errors;
 };
@@ -1610,7 +1608,7 @@ class Routings {
       cb.ownerPermissions = ownerPermissions;
       return cb;
     };
-    this.get(`${p}`, validate("getAll"), async (c) => {
+    this.get(`${p}`, validate("get"), async (c) => {
       const cb = createCrudBuilder(c);
       await cb.get(c);
     });
@@ -1618,7 +1616,7 @@ class Routings {
       const cb = createCrudBuilder(c);
       await cb.add(c);
     });
-    this.get(`${p}/:id`, validate("getOne"), async (c) => {
+    this.get(`${p}/:id`, validate("get"), async (c) => {
       const cb = createCrudBuilder(c);
       await cb.getById(c);
     });

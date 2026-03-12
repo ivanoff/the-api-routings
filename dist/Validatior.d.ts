@@ -1,5 +1,5 @@
 import type { AppContext, CrudBuilderOptionsType, ValidationSchema } from './types';
-type CrudValidationAction = 'getAll' | 'getOne' | 'post' | 'patch' | 'delete';
+type CrudValidationAction = 'get' | 'post' | 'patch' | 'delete';
 type CrudValidationSchema = {
     params?: ValidationSchema;
     query?: ValidationSchema;

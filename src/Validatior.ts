@@ -891,6 +891,7 @@ const validateActionSections = async (
   merged: ResolvedCrudValidation,
 ): Promise<ValidationErrorItem[]> => {
   const errors: ValidationErrorItem[] = [];
+  const paramsData = c.req.param() as Record<string, unknown>;
   let bodyData: unknown;
   let bodyLoaded = false;
 
@@ -938,7 +939,9 @@ const validateActionSections = async (
   };
 
   if (action === 'get') {
-    await run('params', merged.params, c.req.param() as Record<string, unknown>);
+    if (Object.keys(paramsData).length) {
+      await run('params', merged.params, paramsData);
+    }
     await run('query', merged.query, getQueryData(c));
     await run('headers', merged.headers, getHeaderData(c));
     return errors;
@@ -951,13 +954,13 @@ const validateActionSections = async (
   }
 
   if (action === 'patch') {
-    await run('params', merged.params, c.req.param() as Record<string, unknown>);
+    await run('params', merged.params, paramsData);
     await run('headers', merged.headers, getHeaderData(c));
     await run('body', merged.body?.patch, await ensureBody());
     return errors;
   }
 
-  await run('params', merged.params, c.req.param() as Record<string, unknown>);
+  await run('params', merged.params, paramsData);
   await run('headers', merged.headers, getHeaderData(c));
   return errors;
 };
