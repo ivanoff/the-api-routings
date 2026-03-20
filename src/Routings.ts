@@ -24,6 +24,7 @@ export class Routings {
   routesEmailTemplates: RoutesEmailTemplatesType = {};
   crudPermissionsMeta: CrudPermissionMeta[] = [];
   migrationDirs: string[] | undefined;
+  private pathPrefix = '';
 
   constructor(options?: RoutingsOptionsType) {
     if (options?.migrationDirs) this.migrationDirs = options.migrationDirs;
@@ -36,28 +37,45 @@ export class Routings {
     }
   }
 
-  get(path: string, ...fnArr: MiddlewareHandler[]): void {
+  prefix(path: string): Routings {
+    this.pathPrefix = path;
+    return this;
+  }
+
+  get(p: string, ...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}${p}`.replace(/^\/+/g, '/');
     this.pushToRoutes({ method: 'GET', path, fnArr });
+    return this;
   }
 
-  post(path: string, ...fnArr: MiddlewareHandler[]): void {
+  post(p: string, ...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}${p}`.replace(/^\/+/g, '/');
     this.pushToRoutes({ method: 'POST', path, fnArr });
+    return this;
   }
 
-  patch(path: string, ...fnArr: MiddlewareHandler[]): void {
+  patch(p: string, ...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}${p}`.replace(/^\/+/g, '/');
     this.pushToRoutes({ method: 'PATCH', path, fnArr });
+    return this;
   }
 
-  delete(path: string, ...fnArr: MiddlewareHandler[]): void {
+  delete(p: string, ...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}${p}`.replace(/^\/+/g, '/');
     this.pushToRoutes({ method: 'DELETE', path, fnArr });
+    return this;
   }
 
-  use(path: string, ...fnArr: MiddlewareHandler[]): void {
+  use(p: string, ...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}${p}`.replace(/^\/+/g, '/');
     this.pushToRoutes({ path, fnArr });
+    return this;
   }
 
-  all(...fnArr: MiddlewareHandler[]): void {
-    this.pushToRoutes({ path: '*', fnArr });
+  all(...fnArr: MiddlewareHandler[]): Routings {
+    const path = `${this.pathPrefix}*`.replace(/^\/+/g, '/');
+    this.pushToRoutes({ path, fnArr });
+    return this;
   }
 
   crud(params: CrudBuilderOptionsType): void {
@@ -106,7 +124,7 @@ export class Routings {
     });
 
     this.crudPermissionsMeta.push({
-      path: p,
+      path: `${this.pathPrefix}${p}`,
       permissionPrefix,
       methodsConfigured,
       tableName: table,
@@ -132,10 +150,10 @@ export class Routings {
 
   errors(err: RoutesErrorsType | RoutesErrorsType[]): void {
     const errArr = Array.isArray(err) ? err : [err];
-    for (const e of errArr) this.routesErrors = { ...this.routesErrors, ...e };
+    for (const e of errArr) Object.assign(this.routesErrors, e);
   }
 
   emailTemplates(template: RoutesEmailTemplatesType): void {
-    this.routesEmailTemplates = { ...this.routesEmailTemplates, ...template };
+    Object.assign(this.routesEmailTemplates, template);
   }
 }

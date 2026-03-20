@@ -92,6 +92,22 @@ describe('Routings', () => {
         tableName: 'items',
       });
     });
+
+    it('applies prefix scopes to CRUD routes and permissions meta', () => {
+      const router = new Routings();
+      router.prefix('/api/v1').crud({ table: 'items' });
+
+      const paths = router.routes.map((r) => `${r.method} ${r.path}`);
+
+      expect(paths).toContain('GET /api/v1/items');
+      expect(paths).toContain('PATCH /api/v1/items/:id');
+      expect(router.crudPermissionsMeta[0]).toEqual({
+        path: '/api/v1/items',
+        permissionPrefix: 'items',
+        methodsConfigured: false,
+        tableName: 'items',
+      });
+    });
   });
 
   // -- HTTP method helpers ---------------------------------
@@ -134,6 +150,41 @@ describe('Routings', () => {
       router.get('/test', mw1, mw2);
 
       expect(router.routes.length).toBe(2);
+    });
+
+    it('supports chained route registration on a prefixed scope', () => {
+      const router = new Routings();
+
+      router.prefix('/ships')
+        .get('/:id/similar', async () => {})
+        .get('/:id/requests', async () => {})
+        .post('/import', async () => {})
+        .post('/0', async () => {})
+        .post('/0/countries', async () => {});
+
+      const paths = router.routes.map((r) => `${r.method} ${r.path}`);
+
+      expect(paths).toEqual([
+        'GET /ships/:id/similar',
+        'GET /ships/:id/requests',
+        'POST /ships/import',
+        'POST /ships/0',
+        'POST /ships/0/countries',
+      ]);
+    });
+
+    it('switches the current prefix when prefix() is called again', () => {
+      const router = new Routings();
+
+      router.prefix('/v1')
+        .get('/users', async () => {})
+        .prefix('/v2')
+        .get('/users', async () => {});
+
+      const paths = router.routes.map((r) => `${r.method} ${r.path}`);
+
+      expect(paths).toContain('GET /v1/users');
+      expect(paths).toContain('GET /v2/users');
     });
 
     it('use() registers route without method', () => {

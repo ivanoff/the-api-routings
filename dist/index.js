@@ -1582,39 +1582,74 @@ class Routings {
   routesEmailTemplates = {};
   crudPermissionsMeta = [];
   migrationDirs;
+  pathPrefix = "";
   constructor(options) {
     if (options?.migrationDirs)
       this.migrationDirs = options.migrationDirs;
   }
+  normalizePath(path) {
+    return `/${path}`.replace(/^\/+/, "/");
+  }
+  normalizePrefix(path) {
+    const normalized = this.normalizePath(path).replace(/\/+$/, "");
+    return normalized || "/";
+  }
+  resolvePath(path) {
+    if (path === "*") {
+      return this.pathPrefix && this.pathPrefix !== "/" ? `${this.pathPrefix}/*` : "*";
+    }
+    const normalizedPath = this.normalizePath(path);
+    if (!this.pathPrefix || this.pathPrefix === "/")
+      return normalizedPath;
+    return normalizedPath === "/" ? this.pathPrefix : `${this.pathPrefix}${normalizedPath}`.replace(/^\/+/, "/");
+  }
   pushToRoutes({ method, path, fnArr }) {
+    const resolvedPath = this.resolvePath(path);
     for (const fn of fnArr) {
       const handlers = factory.createHandlers(fn);
-      this.routes.push({ path, method, handlers });
+      this.routes.push({ path: resolvedPath, method, handlers });
     }
+  }
+  prefix(path) {
+    const scoped = new Routings({ migrationDirs: this.migrationDirs });
+    scoped.routes = this.routes;
+    scoped.routesPermissions = this.routesPermissions;
+    scoped.routesErrors = this.routesErrors;
+    scoped.routesEmailTemplates = this.routesEmailTemplates;
+    scoped.crudPermissionsMeta = this.crudPermissionsMeta;
+    scoped.pathPrefix = this.resolvePath(this.normalizePrefix(path));
+    return scoped;
   }
   get(path, ...fnArr) {
     this.pushToRoutes({ method: "GET", path, fnArr });
+    return this;
   }
   post(path, ...fnArr) {
     this.pushToRoutes({ method: "POST", path, fnArr });
+    return this;
   }
   patch(path, ...fnArr) {
     this.pushToRoutes({ method: "PATCH", path, fnArr });
+    return this;
   }
   delete(path, ...fnArr) {
     this.pushToRoutes({ method: "DELETE", path, fnArr });
+    return this;
   }
   use(path, ...fnArr) {
     this.pushToRoutes({ path, fnArr });
+    return this;
   }
   all(...fnArr) {
     this.pushToRoutes({ path: "*", fnArr });
+    return this;
   }
   crud(params) {
     const normalizedParams = normalizeCrudConfig(params);
     const { prefix, table, permissions } = normalizedParams;
     const p = `/${prefix || table}`.replace(/^\/+/, "/");
-    const permissionPrefix = p.replace(/^\//, "");
+    const routePath = this.resolvePath(p);
+    const permissionPrefix = routePath.replace(/^\//, "");
     const methods = permissions?.methods || permissions?.protectedMethods;
     const methodsConfigured = Array.isArray(methods);
     const hasExplicitOwnerPermissions = !!normalizedParams.permissions?.owner?.length;
@@ -1653,7 +1688,7 @@ class Routings {
       await cb.delete(c);
     });
     this.crudPermissionsMeta.push({
-      path: p,
+      path: routePath,
       permissionPrefix,
       methodsConfigured,
       tableName: table
@@ -1668,19 +1703,19 @@ class Routings {
       const protectedMethods = methods[0] === "*" ? ["GET", "POST", "PATCH", "DELETE"] : methods;
       for (const method of protectedMethods) {
         if (method === "POST" || method === "GET")
-          register(p, method);
+          register(routePath, method);
         if (method !== "POST")
-          register(`${p}/:id`, method);
+          register(`${routePath}/:id`, method);
       }
     }
   }
   errors(err) {
     const errArr = Array.isArray(err) ? err : [err];
     for (const e of errArr)
-      this.routesErrors = { ...this.routesErrors, ...e };
+      Object.assign(this.routesErrors, e);
   }
   emailTemplates(template) {
-    this.routesEmailTemplates = { ...this.routesEmailTemplates, ...template };
+    Object.assign(this.routesEmailTemplates, template);
   }
 }
 export {

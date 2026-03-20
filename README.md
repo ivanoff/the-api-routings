@@ -42,6 +42,11 @@ const router = new Routings();
 
 router.crud({ table: 'users' });
 router.crud({ table: 'posts', prefix: 'api/posts' });
+router
+  .prefix('/ships')
+  .get('/:id/similar', getSimilarShips)
+  .get('/:id/requests', getRequests)
+  .post('/import', importShip);
 
 // pass router to the-api
 const app = new TheAPI({ routings: [router] });
@@ -122,6 +127,51 @@ router.delete('/items/:id', async (c) => { /* ... */ });
 // Middleware for all routes
 router.use('/api/*', corsMiddleware);
 router.all(loggerMiddleware);
+```
+
+### prefix(path)
+
+Use `prefix()` to set a base path for the next route registrations and keep chaining:
+
+```typescript
+router
+  .prefix('/ships')
+  .get('/:id/similar', getSimilarShips)
+  .get('/:id/requests', getRequests)
+  .post('/import', importShip)
+  .post('/0', parseShip)
+  .post('/0/countries', guessCountryByName);
+```
+
+It is equivalent to:
+
+```typescript
+router.get('/ships/:id/similar', getSimilarShips);
+router.get('/ships/:id/requests', getRequests);
+router.post('/ships/import', importShip);
+router.post('/ships/0', parseShip);
+router.post('/ships/0/countries', guessCountryByName);
+```
+
+Calling `prefix()` again switches the current base path:
+
+```typescript
+router
+  .prefix('/v1')
+  .get('/users', getUsersV1)
+  .prefix('/v2')
+  .get('/users', getUsersV2);
+```
+
+`crud()` also respects the current prefix:
+
+```typescript
+router.prefix('/api/v1').crud({ table: 'posts' });
+// GET    /api/v1/posts
+// POST   /api/v1/posts
+// GET    /api/v1/posts/:id
+// PATCH  /api/v1/posts/:id
+// DELETE /api/v1/posts/:id
 ```
 
 ### crud(options)
